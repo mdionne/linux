@@ -38,22 +38,12 @@ struct afs_server *afs_find_server(struct afs_net *net, const struct rxrpc_peer 
 		seq++; /* 2 on the 1st/lockless path, otherwise odd */
 		read_seqbegin_or_lock(&net->fs_addr_lock, &seq);
 
-		if (peer->src->transport.family == AF_INET6) {
-			hlist_for_each_entry_rcu(server, &net->fs_addresses6, addr6_link) {
-				estate = rcu_dereference(server->endpoint_state);
-				alist = estate->addresses;
-				for (i = 0; i < alist->nr_addrs; i++)
-					if (alist->addrs[i].peer == peer)
-						goto found;
-			}
-		} else {
-			hlist_for_each_entry_rcu(server, &net->fs_addresses4, addr4_link) {
-				estate = rcu_dereference(server->endpoint_state);
-				alist = estate->addresses;
-				for (i = 0; i < alist->nr_addrs; i++)
-					if (alist->addrs[i].peer == peer)
-						goto found;
-			}
+		hlist_for_each_entry_rcu(server, &net->fs_addresses, addr_link) {
+			estate = rcu_dereference(server->endpoint_state);
+			alist = estate->addresses;
+			for (i = 0; i < alist->nr_addrs; i++)
+				if (alist->addrs[i].peer == peer)
+					goto found;
 		}
 
 		server = NULL;
@@ -187,10 +177,8 @@ added_dup:
 	 * bit, but anything we might want to do gets messy and memory
 	 * intensive.
 	 */
-	if (alist->nr_ipv4 > 0)
-		hlist_add_head_rcu(&server->addr4_link, &net->fs_addresses4);
-	if (alist->nr_addrs > alist->nr_ipv4)
-		hlist_add_head_rcu(&server->addr6_link, &net->fs_addresses6);
+	if (alist->nr_addrs > 0)
+		hlist_add_head_rcu(&server->addr_link, &net->fs_addresses);
 
 	write_sequnlock(&net->fs_addr_lock);
 
@@ -521,10 +509,8 @@ static void afs_gc_servers(struct afs_net *net, struct afs_server *gc_list)
 
 			list_del(&server->probe_link);
 			hlist_del_rcu(&server->proc_link);
-			if (!hlist_unhashed(&server->addr4_link))
-				hlist_del_rcu(&server->addr4_link);
-			if (!hlist_unhashed(&server->addr6_link))
-				hlist_del_rcu(&server->addr6_link);
+			if (!hlist_unhashed(&server->addr_link))
+				hlist_del_rcu(&server->addr_link);
 		}
 		write_sequnlock(&net->fs_lock);
 
