@@ -321,8 +321,8 @@ struct afs_net {
 	struct list_head	fs_probe_slow;	/* List of afs_server to probe at 5m intervals */
 	struct hlist_head	fs_proc;	/* procfs servers list */
 
-	struct hlist_head	fs_addresses;	/* afs_server (by lowest IPv6 addr) */
-	seqlock_t		fs_addr_lock;	/* For fs_addresses[46] */
+	struct hlist_head	fs_peers;
+	seqlock_t		fs_peers_lock;	/* For fs_peers */
 
 	struct work_struct	fs_manager;
 	struct timer_list	fs_timer;
@@ -560,7 +560,7 @@ struct afs_server {
 	struct afs_server __rcu	*uuid_next;	/* Next server with same UUID */
 	struct afs_server	*uuid_prev;	/* Previous server with same UUID */
 	struct list_head	probe_link;	/* Link in net->fs_probe_list */
-	struct hlist_node	addr_link;	/* Link in net->fs_addresses6 */
+	struct hlist_node	peer_link;	/* Link in net->fs_peers */
 	struct hlist_node	proc_link;	/* Link in net->fs_proc */
 	struct list_head	volumes;	/* RCU list of afs_server_entry objects */
 	struct afs_server	*gc_next;	/* Next server in manager's list */

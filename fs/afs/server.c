@@ -36,9 +36,9 @@ struct afs_server *afs_find_server(struct afs_net *net, const struct rxrpc_peer 
 			afs_unuse_server_notime(net, server, afs_server_trace_put_find_rsq);
 		server = NULL;
 		seq++; /* 2 on the 1st/lockless path, otherwise odd */
-		read_seqbegin_or_lock(&net->fs_addr_lock, &seq);
+		read_seqbegin_or_lock(&net->fs_peers_lock, &seq);
 
-		hlist_for_each_entry_rcu(server, &net->fs_addresses, addr_link) {
+		hlist_for_each_entry_rcu(server, &net->fs_peers, peer_link) {
 			estate = rcu_dereference(server->endpoint_state);
 			alist = estate->addresses;
 			for (i = 0; i < alist->nr_addrs; i++)
@@ -51,9 +51,9 @@ struct afs_server *afs_find_server(struct afs_net *net, const struct rxrpc_peer 
 	found:
 		server = afs_maybe_use_server(server, afs_server_trace_get_by_addr);
 
-	} while (need_seqretry(&net->fs_addr_lock, seq));
+	} while (need_seqretry(&net->fs_peers_lock, seq));
 
-	done_seqretry(&net->fs_addr_lock, seq);
+	done_seqretry(&net->fs_peers_lock, seq);
 
 	rcu_read_unlock();
 	return server;
@@ -164,9 +164,9 @@ static struct afs_server *afs_install_server(struct afs_cell *cell,
 	hlist_add_head_rcu(&server->proc_link, &net->fs_proc);
 
 added_dup:
-	write_seqlock(&net->fs_addr_lock);
+	write_seqlock(&net->fs_peers_lock);
 	estate = rcu_dereference_protected(server->endpoint_state,
-					   lockdep_is_held(&net->fs_addr_lock.lock));
+					   lockdep_is_held(&net->fs_peers_lock.lock));
 	alist = estate->addresses;
 
 	/* Secondly, if the server has any IPv4 and/or IPv6 addresses, install
@@ -178,9 +178,9 @@ added_dup:
 	 * intensive.
 	 */
 	if (alist->nr_addrs > 0)
-		hlist_add_head_rcu(&server->addr_link, &net->fs_addresses);
+		hlist_add_head_rcu(&server->peer_link, &net->fs_peers);
 
-	write_sequnlock(&net->fs_addr_lock);
+	write_sequnlock(&net->fs_peers_lock);
 
 exists:
 	afs_get_server(server, afs_server_trace_get_install);
@@ -509,8 +509,8 @@ static void afs_gc_servers(struct afs_net *net, struct afs_server *gc_list)
 
 			list_del(&server->probe_link);
 			hlist_del_rcu(&server->proc_link);
-			if (!hlist_unhashed(&server->addr_link))
-				hlist_del_rcu(&server->addr_link);
+			if (!hlist_unhashed(&server->peer_link))
+				hlist_del_rcu(&server->peer_link);
 		}
 		write_sequnlock(&net->fs_lock);
 
