@@ -38,12 +38,22 @@ struct afs_server *afs_find_server(struct afs_net *net, const struct rxrpc_peer 
 		seq++; /* 2 on the 1st/lockless path, otherwise odd */
 		read_seqbegin_or_lock(&net->fs_addr_lock, &seq);
 
-		hlist_for_each_entry_rcu(server, &net->fs_addresses6, addr6_link) {
-			estate = rcu_dereference(server->endpoint_state);
-			alist = estate->addresses;
-			for (i = 0; i < alist->nr_addrs; i++)
-				if (alist->addrs[i].peer == peer)
-					goto found;
+		if (peer->src->transport.family == AF_INET6) {
+			hlist_for_each_entry_rcu(server, &net->fs_addresses6, addr6_link) {
+				estate = rcu_dereference(server->endpoint_state);
+				alist = estate->addresses;
+				for (i = 0; i < alist->nr_addrs; i++)
+					if (alist->addrs[i].peer == peer)
+						goto found;
+			}
+		} else {
+			hlist_for_each_entry_rcu(server, &net->fs_addresses4, addr4_link) {
+				estate = rcu_dereference(server->endpoint_state);
+				alist = estate->addresses;
+				for (i = 0; i < alist->nr_addrs; i++)
+					if (alist->addrs[i].peer == peer)
+						goto found;
+			}
 		}
 
 		server = NULL;
